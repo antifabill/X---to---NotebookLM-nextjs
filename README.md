@@ -1,102 +1,60 @@
-# X to NotebookLM
+# X to NotebookLM Next.js
 
-Local web app for turning X.com posts and article-backed tweets into cleaner NotebookLM source files.
+This repository is the Next.js migration fork of the original Python-based `X---to---NotebookLM` app.
 
-## What it does
+## Current status
 
-- pulls tweet content from X syndication and GraphQL endpoints
-- exports local source files as `.txt`, `.md`, `.pdf`, and optional `.html`
-- downloads tweet and article images into a matching asset folder
-- creates a `manifest.json` and `README-IMPORT.md` guide for each batch
-- can optionally upload the whole batch to Google Drive
-- supports drag-and-drop URL input, clipboard paste, and quick sample loading
-- applies conservative text cleanup for common mojibake artifacts
-- gives you a direct "Open NotebookLM" handoff from the results page
+The fork already supports:
 
-## Why tweet URLs are best
+- paste, drag, or drop X URLs into a browser UI
+- live preview of the first source
+- tweet extraction, including tweet-linked X Articles when the public GraphQL payload exposes the full article body
+- export to `.txt`, `.md`, `.html`, and `.pdf`
+- image download when media exists
+- batch packaging with `manifest.json`, `README-IMPORT.md`, and a zip bundle
+- recent local job history
 
-If a post links to an X Article, start from the tweet URL when you can.
+The original Python implementation is preserved in [`legacy-python/`](./legacy-python).
 
-That path is the most reliable way for the app to capture the full article body instead of just the article preview or summary.
+## Local development
 
-## Run the web app
+Install dependencies:
 
-```powershell
-python .\x_to_notebooklm.py
+```bash
+npm install
 ```
 
-Then open:
+Start the app:
 
-```text
-http://127.0.0.1:8765/
+```bash
+npm run dev
 ```
 
-## Optional Google Drive support
+Open [http://localhost:3000](http://localhost:3000).
 
-Install the optional packages:
+## Production checks
 
-```powershell
-pip install -r .\requirements.txt
+Lint:
+
+```bash
+npm run lint
 ```
 
-To enable the app's Google Drive sign-in flow, you also need a one-time Google Desktop OAuth client JSON file.
+Build:
 
-Recommended filename:
-
-```text
-credentials.json
+```bash
+npm run build
 ```
 
-If you place that file next to `x_to_notebooklm.py`, the web app can use its built-in `Connect Google Drive` flow.
+## Notes
 
-After you connect once in the browser, the saved Drive session is reused for future jobs on the same machine.
+- PDF generation currently relies on local Microsoft Edge headless printing, matching the original local-app workflow.
+- Google Drive auth has not been ported yet in this first Next.js migration slice.
+- This app stores local batch jobs in `.data/jobs`.
 
-## Export flow
+## Next migration steps
 
-1. Paste one or more X URLs.
-2. Choose the formats you want.
-3. Optionally enable image download.
-4. Optionally upload the batch to Google Drive.
-5. Open NotebookLM and import the generated files or the uploaded Drive files.
-
-## CLI usage
-
-Single URL:
-
-```powershell
-python .\x_to_notebooklm.py "https://x.com/itsolelehmann/status/2033919415771713715?s=20"
-```
-
-Custom output folder:
-
-```powershell
-python .\x_to_notebooklm.py --out .\sources "https://x.com/jack/status/20"
-```
-
-Upload a CLI batch to Google Drive:
-
-```powershell
-python .\x_to_notebooklm.py `
-  --upload-drive `
-  --drive-credentials .\credentials.json `
-  "https://x.com/itsolelehmann/status/2033919415771713715?s=20"
-```
-
-## Output files
-
-Each batch can include:
-
-- one `.txt` file per source
-- one `.md` file per source
-- one `.pdf` file per source
-- optional `.html` snapshots
-- an asset folder with downloaded images
-- `manifest.json`
-- `README-IMPORT.md`
-- `notebooklm_sources.zip`
-
-## Current limitation
-
-I did not find an official public NotebookLM deep link that imports files directly into a notebook.
-
-Because of that, the app's NotebookLM button opens NotebookLM itself, and the Drive integration is used as the cleanest supported handoff when you want cloud-based import.
+1. Port Google Drive auth to a proper web flow.
+2. Replace local filesystem assumptions with deployment-friendly storage.
+3. Add Firebase-friendly auth and deployment plumbing.
+4. Keep improving preview quality and article extraction parity.
