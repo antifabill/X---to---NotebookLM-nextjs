@@ -1,10 +1,10 @@
 import AdmZip from "adm-zip";
-import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
-import { slugify } from "@/lib/text";
+import { safeFileName, slugify } from "@/lib/text";
 import type { SourceContent, SourceRecord } from "@/lib/types";
 import { downloadBytes } from "@/lib/x";
 
@@ -39,6 +39,12 @@ function sourceIdentifier(url: string) {
   if (articleMatch?.[1]) return articleMatch[1];
   const base = path.basename(pathname);
   return base || "source";
+}
+
+function outputBaseName(source: SourceContent) {
+  const title = safeFileName(source.title, 120);
+  const author = safeFileName(source.author || "Unknown author", 80);
+  return safeFileName(`${title} - ${author}`, 180);
 }
 
 function buildHeader(source: SourceContent) {
@@ -199,7 +205,7 @@ function makeHtmlSnapshot(source: SourceContent, baseDir: string) {
 </html>`;
 }
 
-function browserBinary() {
+function localBrowserBinary() {
   const candidates = [
     "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
     "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
@@ -213,28 +219,74 @@ function browserBinary() {
   return candidates.find((candidate) => existsSync(candidate)) || null;
 }
 
-function htmlToPdf(htmlPath: string, pdfPath: string) {
-  const browser = browserBinary();
-  if (!browser) return false;
-  const result = spawnSync(
-    browser,
-    [
-      "--headless",
-      "--disable-gpu",
-      "--allow-file-access-from-files",
-      "--no-pdf-header-footer",
-      `--print-to-pdf=${pdfPath}`,
-      new URL(`file://${htmlPath}`).toString(),
-    ],
-    { timeout: 120000 },
-  );
-  return result.status === 0;
+async function resolveBrowserLaunchOptions() {
+  const localBrowser = localBrowserBinary();
+  if (localBrowser) {
+    return {
+      executablePath: localBrowser,
+      args: ["--allow-file-access-from-files"],
+    };
+  }
+
+  try {
+    const chromium = await import("@sparticuz/chromium");
+    const executablePath = await chromium.default.executablePath();
+    if (!executablePath) return null;
+    return {
+      executablePath,
+      args: [...chromium.default.args, "--allow-file-access-from-files"],
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function htmlToPdf(htmlPath: string, pdfPath: string) {
+  const launchOptions = await resolveBrowserLaunchOptions();
+  if (!launchOptions) return false;
+
+  try {
+    const { chromium } = await import("playwright-core");
+    const browser = await chromium.launch({
+      executablePath: launchOptions.executablePath,
+      args: launchOptions.args,
+      headless: true,
+    });
+
+    try {
+      const page = await browser.newPage();
+      const baseHref = pathToFileURL(`${path.dirname(htmlPath)}${path.sep}`).toString();
+      const html = await readFile(htmlPath, "utf8");
+      const htmlWithBase = html.includes("<head>")
+        ? html.replace("<head>", `<head><base href="${baseHref}">`)
+        : `<base href="${baseHref}">${html}`;
+      await page.setContent(htmlWithBase, { waitUntil: "networkidle" });
+      await page.pdf({
+        path: pdfPath,
+        format: "A4",
+        printBackground: true,
+        displayHeaderFooter: false,
+        margin: {
+          top: "18mm",
+          right: "14mm",
+          bottom: "18mm",
+          left: "14mm",
+        },
+      });
+      return true;
+    } finally {
+      await browser.close();
+    }
+  } catch {
+    return false;
+  }
 }
 
 export async function writeSourceOutputs(source: SourceContent, outDir: string, exportFormats: Set<string>, includeMedia: boolean): Promise<SourceRecord> {
   const sourceDirName = slugify(`${source.title}-${sourceIdentifier(source.url)}`);
   const sourceDir = path.join(outDir, sourceDirName);
   const assetDir = path.join(sourceDir, "assets");
+  const baseName = outputBaseName(source);
 
   await mkdir(sourceDir, { recursive: true });
 
@@ -244,27 +296,27 @@ export async function writeSourceOutputs(source: SourceContent, outDir: string, 
   const outputFiles: string[] = [];
 
   if (exportFormats.has("txt")) {
-    const txtName = "source.txt";
+    const txtName = `${baseName}.txt`;
     await writeFile(path.join(sourceDir, txtName), makeTxtContent(source, sourceDir), "utf8");
     outputFiles.push(`${sourceDirName}/${txtName}`);
   }
 
   let htmlName: string | null = null;
   if (exportFormats.has("html") || exportFormats.has("pdf")) {
-    htmlName = "source.html";
+    htmlName = `${baseName}.html`;
     await writeFile(path.join(sourceDir, htmlName), makeHtmlSnapshot(source, sourceDir), "utf8");
     if (exportFormats.has("html")) outputFiles.push(`${sourceDirName}/${htmlName}`);
   }
 
   if (exportFormats.has("md")) {
-    const mdName = "source.md";
+    const mdName = `${baseName}.md`;
     await writeFile(path.join(sourceDir, mdName), makeMdContent(source, sourceDir), "utf8");
     outputFiles.push(`${sourceDirName}/${mdName}`);
   }
 
   if (exportFormats.has("pdf") && htmlName) {
-    const pdfName = "source.pdf";
-    if (htmlToPdf(path.join(sourceDir, htmlName), path.join(sourceDir, pdfName))) {
+    const pdfName = `${baseName}.pdf`;
+    if (await htmlToPdf(path.join(sourceDir, htmlName), path.join(sourceDir, pdfName))) {
       outputFiles.push(`${sourceDirName}/${pdfName}`);
     } else {
       source.note = `${source.note ? `${source.note} ` : ""}PDF export was requested, but browser-based PDF generation was not available.`;

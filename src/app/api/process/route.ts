@@ -10,7 +10,7 @@ export async function POST(request: Request) {
     const result = await runBatch({
       urls: Array.isArray(body.urls) ? body.urls : [],
       folderName: body.folderName || "",
-      exportFormats: Array.isArray(body.exportFormats) ? body.exportFormats : ["txt", "md", "pdf"],
+      exportFormats: Array.isArray(body.exportFormats) ? body.exportFormats : ["txt", "md", "pdf", "html"],
       includeMedia: body.includeMedia !== false,
     });
     return NextResponse.json(result);

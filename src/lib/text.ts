@@ -66,3 +66,14 @@ export function slugify(value: string, maxLength = 90) {
     .replace(/^[-_]+|[-_]+$/g, "")
     .slice(0, maxLength) || "source";
 }
+
+export function safeFileName(value: string, maxLength = 160) {
+  return (
+    repairTextArtifacts(value)
+      .replace(/[<>:"/\\|?*\u0000-\u001f]/g, " ")
+      .replace(/\s+/g, " ")
+      .replace(/[. ]+$/g, "")
+      .trim()
+      .slice(0, maxLength) || "source"
+  );
+}
