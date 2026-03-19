@@ -297,7 +297,7 @@ function collectJobFiles(job: JobResult) {
     for (const file of record.outputFiles) files.add(file);
     for (const file of record.mediaFiles) files.add(file);
   }
-  return [...files];
+  return [...files].sort((left, right) => left.localeCompare(right));
 }
 
 async function fetchJobFile(baseUrl: string, jobId: string, relativeFile: string) {

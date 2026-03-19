@@ -72,6 +72,12 @@ type TweetPayload = {
   };
 };
 
+type UrlEntity = {
+  url?: string;
+  expanded_url?: string;
+  display_url?: string;
+};
+
 type ArticleBlock = {
   type?: string;
   text?: string;
@@ -91,11 +97,26 @@ type UserResult = {
   name?: string;
 };
 
+type TweetLegacy = {
+  screen_name?: string;
+  created_at?: string;
+  full_text?: string;
+  entities?: { urls?: UrlEntity[] };
+  quoted_status_permalink?: {
+    expanded?: string;
+    display?: string;
+    url?: string;
+  };
+};
+
 type TweetGraphqlResult = {
   __typename?: string;
   article?: { article_results?: { result?: ArticleResult } };
   core?: { user_results?: { result?: UserResult } };
-  legacy?: { screen_name?: string; created_at?: string };
+  legacy?: TweetLegacy;
+  note_tweet?: { note_tweet_results?: { result?: { text?: string } } };
+  quoted_status_result?: { result?: TweetGraphqlResult };
+  rest_id?: string;
 };
 
 async function fetchText(url: string, init?: RequestInit, accept = "text/html,application/json") {
@@ -230,6 +251,41 @@ function expandUrls(text: string, entities: { urls?: Array<{ url?: string; expan
   return repairTextArtifacts(expanded);
 }
 
+function graphqlTweetAuthor(tweetResult?: TweetGraphqlResult | null) {
+  const userResult = tweetResult?.core?.user_results?.result || {};
+  const legacy = tweetResult?.legacy || {};
+  const screenName = userResult?.core?.screen_name || legacy?.screen_name;
+  const userName = userResult?.core?.name || userResult?.legacy?.name || userResult?.name;
+  if (userName && screenName) return repairTextArtifacts(`${userName} (@${screenName})`);
+  if (userName) return repairTextArtifacts(userName);
+  if (screenName) return `@${screenName}`;
+  return null;
+}
+
+function graphqlTweetPublished(tweetResult?: TweetGraphqlResult | null) {
+  return tweetResult?.legacy?.created_at || null;
+}
+
+function graphqlTweetText(tweetResult?: TweetGraphqlResult | null) {
+  const noteText = tweetResult?.note_tweet?.note_tweet_results?.result?.text;
+  if (noteText?.trim()) return repairTextArtifacts(noteText.trim());
+
+  const fullText = tweetResult?.legacy?.full_text;
+  if (fullText?.trim()) {
+    return expandUrls(repairTextArtifacts(fullText), tweetResult?.legacy?.entities || {});
+  }
+
+  return "";
+}
+
+function graphqlQuotedSourceUrl(tweetResult?: TweetGraphqlResult | null) {
+  return repairTextArtifacts(
+    tweetResult?.legacy?.quoted_status_permalink?.expanded ||
+      tweetResult?.legacy?.quoted_status_permalink?.url ||
+      "",
+  );
+}
+
 async function fetchTweetPayload(tweetId: string) {
   const data = await fetchJson<TweetPayload>(
     `https://cdn.syndication.twimg.com/tweet-result?id=${tweetId}&lang=en&token=1`,
@@ -321,19 +377,30 @@ function articleBlocksToText(blocks: ArticleBlock[]) {
   return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
-function articleSourceFromGraphql(tweetResult: TweetGraphqlResult, url: string): SourceContent | null {
+function articleSourceFromGraphql(
+  tweetResult: TweetGraphqlResult | null | undefined,
+  url: string,
+  options?: { contextTweet?: TweetGraphqlResult | null },
+): SourceContent | null {
   const articleResult = tweetResult?.article?.article_results?.result;
   if (!articleResult?.content_state) return null;
-  const userResult = tweetResult?.core?.user_results?.result || {};
-  const legacy = tweetResult.legacy || {};
   const title = repairTextArtifacts(articleResult.title || "X Article");
-  const screenName = userResult?.core?.screen_name || legacy?.screen_name;
-  const userName = userResult?.core?.name || userResult?.legacy?.name || userResult?.name;
-  const author = userName && screenName ? repairTextArtifacts(`${userName} (@${screenName})`) : screenName ? `@${screenName}` : null;
+  const author = graphqlTweetAuthor(tweetResult);
   const firstPublishedAt = articleResult?.metadata?.first_published_at_secs;
   const published = firstPublishedAt
     ? new Date(firstPublishedAt * 1000).toISOString().replace("T", " ").replace(".000Z", " UTC")
-    : legacy?.created_at || null;
+    : graphqlTweetPublished(tweetResult);
+
+  const notes = [`Captured from X article attached to tweet: ${url}`];
+  const contextText = graphqlTweetText(options?.contextTweet);
+  const contextAuthor = graphqlTweetAuthor(options?.contextTweet);
+  const quotedSourceUrl = graphqlQuotedSourceUrl(options?.contextTweet);
+  if (contextText) {
+    notes.push(`Quote-tweet context${contextAuthor ? ` from ${contextAuthor}` : ""}: ${contextText}`);
+  }
+  if (quotedSourceUrl) {
+    notes.push(`Quoted source: ${quotedSourceUrl}`);
+  }
 
   return {
     url,
@@ -342,7 +409,7 @@ function articleSourceFromGraphql(tweetResult: TweetGraphqlResult, url: string):
     author,
     published,
     body: articleBlocksToText(articleResult?.content_state?.blocks || []),
-    note: `Captured from X article attached to tweet: ${url}`,
+    note: notes.join(" "),
     media: articleEntitiesToMedia(articleResult),
   };
 }
@@ -370,12 +437,15 @@ function buildTweetMedia(payload: TweetPayload): MediaAsset[] {
 }
 
 async function parseTweet(url: string): Promise<SourceContent> {
+  const tweetId = tweetIdFromUrl(url);
+  let tweetResult: TweetGraphqlResult | null = null;
+
   try {
-    const tweetResult = await fetchTweetGraphql(tweetIdFromUrl(url));
+    tweetResult = await fetchTweetGraphql(tweetId);
     const articleSource = articleSourceFromGraphql(tweetResult, url);
     if (articleSource) {
       try {
-        const payload = await fetchTweetPayload(tweetIdFromUrl(url));
+        const payload = await fetchTweetPayload(tweetId);
         const existing = new Set(articleSource.media.map((asset) => asset.sourceUrl));
         for (const asset of buildTweetMedia(payload)) {
           if (!existing.has(asset.sourceUrl)) {
@@ -385,13 +455,31 @@ async function parseTweet(url: string): Promise<SourceContent> {
       } catch {}
       return articleSource;
     }
+
+    const quotedArticleSource = articleSourceFromGraphql(tweetResult?.quoted_status_result?.result, url, {
+      contextTweet: tweetResult,
+    });
+    if (quotedArticleSource) {
+      try {
+        const payload = await fetchTweetPayload(tweetId);
+        const existing = new Set(quotedArticleSource.media.map((asset) => asset.sourceUrl));
+        for (const asset of buildTweetMedia(payload)) {
+          if (!existing.has(asset.sourceUrl)) {
+            quotedArticleSource.media.push(asset);
+          }
+        }
+      } catch {}
+      return quotedArticleSource;
+    }
   } catch {}
 
-  const payload = await fetchTweetPayload(tweetIdFromUrl(url));
-  const screenName = payload.user?.screen_name;
-  const authorName = payload.user?.name;
+  const payload = await fetchTweetPayload(tweetId);
+  const screenName = payload.user?.screen_name || tweetResult?.core?.user_results?.result?.core?.screen_name;
+  const authorName = payload.user?.name || tweetResult?.core?.user_results?.result?.core?.name;
   const author = authorName && screenName ? `${authorName} (@${screenName})` : authorName || screenName || null;
-  const text = expandUrls(repairTextArtifacts(payload.text || ""), payload.entities || {});
+  const text =
+    graphqlTweetText(tweetResult) ||
+    expandUrls(repairTextArtifacts(payload.text || ""), payload.entities || {});
   const sections = [text.trim()];
   let note: string | null = null;
 

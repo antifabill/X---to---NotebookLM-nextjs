@@ -25,7 +25,7 @@ export function AppShell({ initialRecentJobs }: AppShellProps) {
   const [fmtTxt, setFmtTxt] = useState(true);
   const [fmtMd, setFmtMd] = useState(true);
   const [fmtPdf, setFmtPdf] = useState(true);
-  const [fmtHtml, setFmtHtml] = useState(false);
+  const [fmtHtml, setFmtHtml] = useState(true);
   const [preview, setPreview] = useState<PreviewPayload | null>(null);
   const [previewStatus, setPreviewStatus] = useState("Waiting for a URL");
   const [result, setResult] = useState<JobResult | null>(null);

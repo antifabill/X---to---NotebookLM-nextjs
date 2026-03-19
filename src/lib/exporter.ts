@@ -31,6 +31,16 @@ async function downloadMediaAssets(source: SourceContent, assetDir: string) {
   return saved;
 }
 
+function sourceIdentifier(url: string) {
+  const pathname = new URL(url).pathname;
+  const tweetMatch = /\/status\/(\d+)/.exec(pathname);
+  if (tweetMatch?.[1]) return tweetMatch[1];
+  const articleMatch = /\/(?:i\/)?article\/(\d+)/.exec(pathname);
+  if (articleMatch?.[1]) return articleMatch[1];
+  const base = path.basename(pathname);
+  return base || "source";
+}
+
 function buildHeader(source: SourceContent) {
   const lines = [source.title, "=".repeat(source.title.length), "", "Metadata", "--------", `Source: ${source.url}`];
   if (source.author) lines.push(`Author: ${source.author}`);
@@ -40,12 +50,13 @@ function buildHeader(source: SourceContent) {
   return lines;
 }
 
-function makeTxtContent(source: SourceContent) {
+function makeTxtContent(source: SourceContent, baseDir: string) {
   const lines = buildHeader(source);
   lines.push(source.body.trim());
-  if (source.media.length) {
+  const mediaPaths = relativeMediaPaths(source, baseDir);
+  if (mediaPaths.length) {
     lines.push("", "Images", "------");
-    for (const asset of source.media) lines.push(`- ${asset.localPath || asset.sourceUrl}`);
+    for (const mediaPath of mediaPaths) lines.push(`- ${mediaPath}`);
   }
   return `${lines.join("\n").trim()}\n`;
 }
@@ -188,19 +199,25 @@ function makeHtmlSnapshot(source: SourceContent, baseDir: string) {
 </html>`;
 }
 
-function edgeBinary() {
+function browserBinary() {
   const candidates = [
     "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
     "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+    "/usr/bin/microsoft-edge",
+    "/usr/bin/microsoft-edge-stable",
+    "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
   ];
   return candidates.find((candidate) => existsSync(candidate)) || null;
 }
 
 function htmlToPdf(htmlPath: string, pdfPath: string) {
-  const edge = edgeBinary();
-  if (!edge) return false;
+  const browser = browserBinary();
+  if (!browser) return false;
   const result = spawnSync(
-    edge,
+    browser,
     [
       "--headless",
       "--disable-gpu",
@@ -215,37 +232,42 @@ function htmlToPdf(htmlPath: string, pdfPath: string) {
 }
 
 export async function writeSourceOutputs(source: SourceContent, outDir: string, exportFormats: Set<string>, includeMedia: boolean): Promise<SourceRecord> {
-  const baseName = slugify(`${source.title}-${path.basename(new URL(source.url).pathname)}`);
-  const assetDir = path.join(outDir, `${baseName}_assets`);
+  const sourceDirName = slugify(`${source.title}-${sourceIdentifier(source.url)}`);
+  const sourceDir = path.join(outDir, sourceDirName);
+  const assetDir = path.join(sourceDir, "assets");
 
-  const mediaFiles = includeMedia ? await downloadMediaAssets(source, assetDir) : [];
+  await mkdir(sourceDir, { recursive: true });
+
+  const mediaFiles = includeMedia
+    ? (await downloadMediaAssets(source, assetDir)).map((file) => `${sourceDirName}/${file}`)
+    : [];
   const outputFiles: string[] = [];
 
   if (exportFormats.has("txt")) {
-    const txtName = `${baseName}.txt`;
-    await writeFile(path.join(outDir, txtName), makeTxtContent(source), "utf8");
-    outputFiles.push(txtName);
+    const txtName = "source.txt";
+    await writeFile(path.join(sourceDir, txtName), makeTxtContent(source, sourceDir), "utf8");
+    outputFiles.push(`${sourceDirName}/${txtName}`);
   }
 
   let htmlName: string | null = null;
   if (exportFormats.has("html") || exportFormats.has("pdf")) {
-    htmlName = `${baseName}.html`;
-    await writeFile(path.join(outDir, htmlName), makeHtmlSnapshot(source, outDir), "utf8");
-    if (exportFormats.has("html")) outputFiles.push(htmlName);
+    htmlName = "source.html";
+    await writeFile(path.join(sourceDir, htmlName), makeHtmlSnapshot(source, sourceDir), "utf8");
+    if (exportFormats.has("html")) outputFiles.push(`${sourceDirName}/${htmlName}`);
   }
 
   if (exportFormats.has("md")) {
-    const mdName = `${baseName}.md`;
-    await writeFile(path.join(outDir, mdName), makeMdContent(source, outDir), "utf8");
-    outputFiles.push(mdName);
+    const mdName = "source.md";
+    await writeFile(path.join(sourceDir, mdName), makeMdContent(source, sourceDir), "utf8");
+    outputFiles.push(`${sourceDirName}/${mdName}`);
   }
 
   if (exportFormats.has("pdf") && htmlName) {
-    const pdfName = `${baseName}.pdf`;
-    if (htmlToPdf(path.join(outDir, htmlName), path.join(outDir, pdfName))) {
-      outputFiles.push(pdfName);
+    const pdfName = "source.pdf";
+    if (htmlToPdf(path.join(sourceDir, htmlName), path.join(sourceDir, pdfName))) {
+      outputFiles.push(`${sourceDirName}/${pdfName}`);
     } else {
-      source.note = `${source.note ? `${source.note} ` : ""}PDF export was requested, but Edge PDF generation was not available.`;
+      source.note = `${source.note ? `${source.note} ` : ""}PDF export was requested, but browser-based PDF generation was not available.`;
     }
   }
 
