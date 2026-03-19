@@ -14,8 +14,8 @@ env:
   #     - BUILD
   #     - RUNTIME
 
-  # Add this secret in Firebase App Hosting or the Firebase console when you are
-  # ready to enable browser-based Google Drive sign-in in production:
-  # firebase apphosting:secrets:set NEXT_PUBLIC_GOOGLE_CLIENT_ID --project promptsmith-63ac5
-  # - variable: NEXT_PUBLIC_GOOGLE_CLIENT_ID
-  #   secret: NEXT_PUBLIC_GOOGLE_CLIENT_ID
+  - variable: NEXT_PUBLIC_GOOGLE_CLIENT_ID
+    value: 427672120146-pad59667c3odvrnqk9l5516ah20s8u3h.apps.googleusercontent.com
+    availability:
+      - BUILD
+      - RUNTIME

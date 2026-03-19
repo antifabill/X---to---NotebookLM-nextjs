@@ -80,11 +80,7 @@ Live URL:
 
 - [https://x-to-notebooklm-nextjs--promptsmith-63ac5.us-central1.hosted.app](https://x-to-notebooklm-nextjs--promptsmith-63ac5.us-central1.hosted.app)
 
-To enable Drive sign-in on the live site, add the App Hosting secret:
-
-```bash
-firebase apphosting:secrets:set NEXT_PUBLIC_GOOGLE_CLIENT_ID --project promptsmith-63ac5
-```
+Drive sign-in is configured on the live site through `apphosting.yaml` using the Google OAuth client ID as a public env value.
 
 If you want persisted cloud job storage on App Hosting, also set:
 
@@ -96,7 +92,6 @@ env:
 
 ## Next migration steps
 
-1. Add the production Google OAuth client ID secret in App Hosting.
-2. Provision a dedicated storage bucket for persisted hosted job history.
-3. Improve article extraction parity and quality on edge-case X payloads.
-4. Replace the temporary GitHub deploy token flow with Workload Identity or a dedicated service account when ready.
+1. Provision a dedicated storage bucket for persisted hosted job history.
+2. Improve article extraction parity and quality on edge-case X payloads.
+3. Replace the temporary GitHub deploy token flow with Workload Identity or a dedicated service account when ready.

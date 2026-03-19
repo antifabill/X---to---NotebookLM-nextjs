@@ -36,4 +36,4 @@ Last updated: 2026-03-19
 - Firebase App Hosting is configured for project `promptsmith-63ac5`.
 - Live deployed URL: `https://x-to-notebooklm-nextjs--promptsmith-63ac5.us-central1.hosted.app`
 - GitHub Actions deployment is configured in `.github/workflows/firebase-apphosting.yml`.
-- Browser-based Drive sign-in in production still needs a real `NEXT_PUBLIC_GOOGLE_CLIENT_ID` App Hosting secret before it can be enabled on the live site.
+- Browser-based Drive sign-in is enabled on the live site through a public App Hosting env value for `NEXT_PUBLIC_GOOGLE_CLIENT_ID`.
