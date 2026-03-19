@@ -1,0 +1,21 @@
+# Settings for Backend (on Cloud Run).
+# See https://firebase.google.com/docs/app-hosting/configure#cloud-run
+runConfig:
+  minInstances: 0
+  maxInstances: 2
+  cpu: 1
+  memoryMiB: 1024
+
+env:
+  # Enable this after you provision a runtime bucket for persisted batch storage.
+  # - variable: APP_STORAGE_BUCKET
+  #   value: your-storage-bucket-name
+  #   availability:
+  #     - BUILD
+  #     - RUNTIME
+
+  # Add this secret in Firebase App Hosting or the Firebase console when you are
+  # ready to enable browser-based Google Drive sign-in in production:
+  # firebase apphosting:secrets:set NEXT_PUBLIC_GOOGLE_CLIENT_ID --project promptsmith-63ac5
+  # - variable: NEXT_PUBLIC_GOOGLE_CLIENT_ID
+  #   secret: NEXT_PUBLIC_GOOGLE_CLIENT_ID

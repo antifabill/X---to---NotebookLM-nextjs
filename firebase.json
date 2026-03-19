@@ -1,0 +1,16 @@
+{
+  "apphosting": {
+    "backendId": "x-to-notebooklm-nextjs",
+    "rootDir": "/",
+    "ignore": [
+      "node_modules",
+      ".git",
+      ".next",
+      ".data",
+      "legacy-python",
+      "firebase-debug.log",
+      "firebase-debug.*.log"
+    ],
+    "alwaysDeployFromSource": true
+  }
+}

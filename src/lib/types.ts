@@ -59,7 +59,14 @@ export type JobResult = {
   bundleFile: string;
 };
 
-export type DriveState = {
-  connected: boolean;
+export type DriveAccount = {
+  email: string;
+  name?: string | null;
+  picture?: string | null;
+};
+
+export type DriveClientState = {
+  status: "unavailable" | "disconnected" | "connecting" | "connected";
   message: string;
+  account?: DriveAccount | null;
 };

@@ -1,5 +1,3 @@
-import { readFile } from "node:fs/promises";
-
 import { getJob, resolveJobFile } from "@/lib/notebooklm";
 
 export const runtime = "nodejs";
@@ -14,7 +12,7 @@ export async function GET(_: Request, context: { params: Promise<{ jobId: string
   if (!file) {
     return new Response("Bundle not found", { status: 404 });
   }
-  return new Response(await readFile(file.path), {
+  return new Response(new Uint8Array(file.bytes), {
     headers: {
       "Content-Type": "application/zip",
       "Content-Disposition": `attachment; filename="${file.name}"`,

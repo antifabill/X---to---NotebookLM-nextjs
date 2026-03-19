@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import { resolveJobFile } from "@/lib/notebooklm";
@@ -35,7 +34,7 @@ export async function GET(request: Request, context: { params: Promise<{ jobId: 
   if (!file) {
     return new Response("File not found", { status: 404 });
   }
-  return new Response(await readFile(file.path), {
+  return new Response(new Uint8Array(file.bytes), {
     headers: {
       "Content-Type": contentTypeForExtension(path.extname(file.name).toLowerCase()),
       "Content-Disposition": `attachment; filename="${file.name}"`,

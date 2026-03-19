@@ -2,17 +2,22 @@
 
 import { FormEvent, useEffect, useState, useTransition } from "react";
 
-import type { DriveState, JobResult, PreviewPayload } from "@/lib/notebooklm";
+import {
+  connectGoogleDrive,
+  disconnectGoogleDrive,
+  getDriveClientState,
+  uploadJobToDrive,
+} from "@/lib/google-drive";
+import type { DriveClientState, JobResult, PreviewPayload } from "@/lib/notebooklm";
 
 type AppShellProps = {
   initialRecentJobs: JobResult[];
-  driveState: DriveState;
 };
 
 const SAMPLE_URL = "https://x.com/itsolelehmann/status/2033919415771713715?s=20";
 const NOTEBOOKLM_URL = "https://notebooklm.google.com/";
 
-export function AppShell({ initialRecentJobs, driveState }: AppShellProps) {
+export function AppShell({ initialRecentJobs }: AppShellProps) {
   const [urls, setUrls] = useState("");
   const [folderName, setFolderName] = useState("");
   const [includeMedia, setIncludeMedia] = useState(true);
@@ -26,7 +31,34 @@ export function AppShell({ initialRecentJobs, driveState }: AppShellProps) {
   const [result, setResult] = useState<JobResult | null>(null);
   const [recentJobs, setRecentJobs] = useState(initialRecentJobs);
   const [error, setError] = useState<string | null>(null);
+  const [drive, setDrive] = useState<DriveClientState>({
+    status: "connecting",
+    message: "Checking Google Drive connection...",
+  });
+  const [driveBusy, setDriveBusy] = useState(false);
+  const [driveUploadMessage, setDriveUploadMessage] = useState<string | null>(null);
+  const [driveFolderUrl, setDriveFolderUrl] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    let cancelled = false;
+    getDriveClientState()
+      .then((state) => {
+        if (!cancelled) setDrive(state);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDrive({
+            status: "disconnected",
+            message: "Google Drive could not be initialized in this browser yet.",
+          });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const firstUrl = urls
@@ -111,6 +143,51 @@ export function AppShell({ initialRecentJobs, driveState }: AppShellProps) {
     return formats;
   }
 
+  async function handleDriveConnect() {
+    setError(null);
+    setDriveBusy(true);
+    setDriveUploadMessage(null);
+    try {
+      setDrive(await connectGoogleDrive(true));
+    } catch (connectError) {
+      setError(connectError instanceof Error ? connectError.message : "Could not connect Google Drive.");
+    } finally {
+      setDriveBusy(false);
+    }
+  }
+
+  async function handleDriveDisconnect() {
+    setDriveBusy(true);
+    setDriveUploadMessage(null);
+    try {
+      setDrive(await disconnectGoogleDrive());
+      setDriveFolderUrl(null);
+    } finally {
+      setDriveBusy(false);
+    }
+  }
+
+  async function handleDriveUpload(job: JobResult) {
+    setError(null);
+    setDriveBusy(true);
+    setDriveUploadMessage("Connecting to Google Drive...");
+    try {
+      const state = await connectGoogleDrive(false);
+      setDrive(state);
+      const upload = await uploadJobToDrive(job, {
+        baseUrl: window.location.origin,
+        onProgress: (current, total, fileName) =>
+          setDriveUploadMessage(`Uploading ${current}/${total}: ${fileName}`),
+      });
+      setDriveFolderUrl(upload.folderUrl);
+      setDriveUploadMessage(`Uploaded ${upload.uploadedCount} files to Google Drive.`);
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : "Could not upload the batch to Google Drive.");
+    } finally {
+      setDriveBusy(false);
+    }
+  }
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
@@ -175,8 +252,9 @@ export function AppShell({ initialRecentJobs, driveState }: AppShellProps) {
         <div className="heroCard">
           <div className="pill">Migration note</div>
           <p>
-            Google Drive auth is not ported in this first migration slice yet. I kept the extraction
-            and export path as the first milestone because that is the backbone of the app.
+            Google Drive is now set up as a browser-based auth and upload flow. Once connected, the
+            app can push a generated batch directly into a Drive folder without a local
+            `credentials.json` step for the end user.
           </p>
         </div>
       </section>
@@ -255,7 +333,32 @@ export function AppShell({ initialRecentJobs, driveState }: AppShellProps) {
 
             <div className="stackCard">
               <span className="sectionLabel">Google Drive</span>
-              <p className="helperText">{driveState.message}</p>
+              <p className="helperText">{drive.message}</p>
+              {drive.account?.email ? <div className="helperText">{drive.account.email}</div> : null}
+              {driveUploadMessage ? <div className="helperText">{driveUploadMessage}</div> : null}
+              {driveFolderUrl ? (
+                <a className="badge" href={driveFolderUrl} target="_blank" rel="noreferrer">
+                  Open uploaded folder
+                </a>
+              ) : null}
+              <div className="toolRow">
+                <button
+                  className="ghostButton"
+                  type="button"
+                  onClick={handleDriveConnect}
+                  disabled={driveBusy || drive.status === "unavailable"}
+                >
+                  {drive.status === "connected" ? "Reconnect" : "Connect Google Drive"}
+                </button>
+                <button
+                  className="secondaryButton"
+                  type="button"
+                  onClick={handleDriveDisconnect}
+                  disabled={driveBusy || drive.status !== "connected"}
+                >
+                  Disconnect
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -309,6 +412,14 @@ export function AppShell({ initialRecentJobs, driveState }: AppShellProps) {
             <a className="secondaryButton linkButton" href={`/api/jobs/${result.jobId}/download?file=${encodeURIComponent(result.guideFile)}`}>
               Import guide
             </a>
+            <button
+              className="secondaryButton"
+              type="button"
+              onClick={() => void handleDriveUpload(result)}
+              disabled={driveBusy || drive.status === "unavailable"}
+            >
+              {driveBusy ? "Working..." : "Upload batch to Drive"}
+            </button>
           </div>
         </section>
       ) : null}
@@ -326,6 +437,14 @@ export function AppShell({ initialRecentJobs, driveState }: AppShellProps) {
                 <div className="badgeRow">
                   <a className="badge" href={`/api/jobs/${job.jobId}/bundle`}>ZIP</a>
                   <a className="badge" href={`/api/jobs/${job.jobId}/download?file=${encodeURIComponent(job.guideFile)}`}>GUIDE</a>
+                  <button
+                    className="badge"
+                    type="button"
+                    onClick={() => void handleDriveUpload(job)}
+                    disabled={driveBusy || drive.status === "unavailable"}
+                  >
+                    DRIVE
+                  </button>
                 </div>
               </article>
             ))

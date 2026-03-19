@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@google-cloud/storage": "^7.19.0",
     "adm-zip": "^0.5.16",
     "cheerio": "^1.1.2",
     "next": "16.2.0",
