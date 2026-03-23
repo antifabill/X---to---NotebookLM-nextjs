@@ -39,6 +39,9 @@
 - `src/lib/google-drive.ts` keeps the Drive access token and account profile in browser `localStorage`, loads Google Identity Services in the browser, and uploads directly from the client to Google Drive; future Drive troubleshooting will still require a signed-in browser session because there is no server-side upload API.
 - Hosted PDF generation now works on App Hosting, but the fix depends on internal `@sparticuz/chromium` helper files plus a route-scoped tracing include in `next.config.ts`, so future package upgrades or build-system changes could break it again.
 - `.github/workflows/firebase-apphosting.yml` still deploys with `FIREBASE_TOKEN`, and both `README.md` and `roadmap.md` say this should be replaced.
+- On 2026-03-23, GitHub Actions run `23439436826` for commit `0a91ff0` failed with `Process completed with exit code 1`; GitHub also surfaced a separate Node.js 20 deprecation warning for `actions/checkout@v4` and `actions/setup-node@v4`. The live App Hosting site still responded afterward, so the failure blocked the latest deploy rather than taking production down.
+- The concrete cause of that failed deploy is now known: App Hosting/Cloud Build uses `npm ci`, and commit `0a91ff0` added `vitest`-related dependencies in `package.json` without the matching `package-lock.json` update. Local `npm run build` still passed, but remote deploys fail until the lockfile is synced.
+- On 2026-03-23, `npm install` was run locally to resync `package-lock.json`, and `npm test`, `npm run lint`, and `npm run build` all passed afterward. The immediate deploy fix is ready to commit/push.
 - Current docs and `src/lib/exporter.ts` agree that exports are folderized per source and use descriptive filenames based on source title/author, plus `assets/` for media.
 
 ## Decisions and Rationale
@@ -52,8 +55,11 @@
 
 ## Active Work
 - `roadmap.md` now treats both bucket provisioning and hosted persistence verification as complete, while still listing `FIREBASE_TOKEN` replacement, staging/production environments, and runtime monitoring/triage notes.
-- Regression coverage for quote-tweet article extraction, folderized exports, hosted PDF seam behavior, and Drive path preservation is now implemented locally but still needs to be committed and pushed.
+- Regression coverage for quote-tweet article extraction, folderized exports, hosted PDF seam behavior, and Drive path preservation has now been committed and pushed in `0a91ff0`.
 - The next likely implementation slice is deploy-auth hardening: replace `FIREBASE_TOKEN` in `.github/workflows/firebase-apphosting.yml` with Workload Identity Federation or a dedicated service-account flow.
+- Before that hardening lands, the immediate deploy concern is to inspect the failed GitHub Actions run for commit `0a91ff0` and determine whether the latest code needs a manual redeploy or whether the failure was a transient/auth-only CI problem.
+- The immediate fix needed now is to update and commit `package-lock.json` so App Hosting `npm ci` can install the new Vitest dependencies, then redeploy.
+- The lockfile fix has now been applied locally. The next step is to commit `package-lock.json` plus memory and let GitHub/App Hosting rerun the deploy.
 - Product flow work still open includes improving Drive auth/error UX and improving the NotebookLM handoff.
 - Storage/job lifecycle work still open includes retention rules, clearer hosted-mode behavior, and a delete-job action in the UI.
 - `roadmap.md` also lists a major UI makeover, but `HANDOFF.md` and `OPERATOR-PROMPT.md` say not to start that redesign yet unless needed for a blocking fix.
