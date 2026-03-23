@@ -1,12 +1,20 @@
 import AdmZip from "adm-zip";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+// @ts-expect-error Internal Sparticuz helper file has no published TypeScript declarations.
+import { setupLambdaEnvironment } from "../../node_modules/@sparticuz/chromium/build/cjs/helper.cjs";
+// @ts-expect-error Internal Sparticuz helper file has no published TypeScript declarations.
+import { inflate as inflateSparticuzArchive } from "../../node_modules/@sparticuz/chromium/build/cjs/lambdafs.cjs";
 import { safeFileName, slugify } from "@/lib/text";
 import type { SourceContent, SourceRecord } from "@/lib/types";
 import { downloadBytes } from "@/lib/x";
+
+const require = createRequire(import.meta.url);
 
 function safeExtensionFromUrl(url: string, fallback = ".jpg") {
   try {
@@ -219,22 +227,111 @@ function localBrowserBinary() {
   return candidates.find((candidate) => existsSync(candidate)) || null;
 }
 
-async function resolveBrowserLaunchOptions() {
+type BrowserLaunchOptions = {
+  runtime: "local" | "sparticuz";
+  executablePath: string;
+  args: string[];
+  headlessMode: boolean;
+};
+
+const SPARTICUZ_REQUIRED_ARCHIVES = ["chromium.br", "fonts.tar.br", "swiftshader.tar.br"] as const;
+
+function isValidSparticuzBinDirectory(candidate: string) {
+  return SPARTICUZ_REQUIRED_ARCHIVES.every((archive) => existsSync(path.join(candidate, archive)));
+}
+
+async function resolveSparticuzBinDirectory() {
+  const candidates: string[] = [];
+  candidates.push(path.join(process.cwd(), "node_modules", "@sparticuz", "chromium", "bin"));
+  const tracedRoot = path.join(process.cwd(), ".next", "node_modules", "@sparticuz");
+
+  if (existsSync(tracedRoot)) {
+    try {
+      const tracedEntries = await readdir(tracedRoot, { withFileTypes: true });
+      for (const entry of tracedEntries) {
+        if (!entry.isDirectory() || !entry.name.startsWith("chromium-")) continue;
+        candidates.push(path.join(tracedRoot, entry.name, "bin"));
+      }
+    } catch {
+      // Fall through to package-root lookup below.
+    }
+  }
+
+  try {
+    const packageEntry = require.resolve("@sparticuz/chromium");
+    const packageRoot = path.resolve(path.dirname(packageEntry), "..", "..");
+    candidates.push(path.join(packageRoot, "bin"));
+  } catch {
+    // Ignore resolution failures here and fall back to returning null below.
+  }
+
+  for (const candidate of candidates) {
+    if (isValidSparticuzBinDirectory(candidate)) return candidate;
+  }
+
+  return null;
+}
+
+async function ensureSparticuzAl2023Libraries(sparticuzBinDirectory: string) {
+  const al2023Archive = path.join(sparticuzBinDirectory, "al2023.tar.br");
+  if (!existsSync(al2023Archive)) return;
+
+  const al2023LibPath = path.join(tmpdir(), "al2023", "lib");
+
+  try {
+    await inflateSparticuzArchive(al2023Archive);
+    setupLambdaEnvironment(al2023LibPath);
+  } catch (error) {
+    console.warn(
+      `[pdf] Failed to prepare Sparticuz AL2023 libraries from ${al2023Archive}.`,
+      error instanceof Error ? error.message : error,
+    );
+  }
+}
+
+async function resolveBrowserLaunchOptions(): Promise<BrowserLaunchOptions | null> {
   const localBrowser = localBrowserBinary();
   if (localBrowser) {
     return {
+      runtime: "local" as const,
       executablePath: localBrowser,
       args: ["--allow-file-access-from-files"],
+      headlessMode: true,
     };
   }
 
   try {
     const chromium = await import("@sparticuz/chromium");
-    const executablePath = await chromium.default.executablePath();
-    if (!executablePath) return null;
+    const sparticuzBinDirectory = await resolveSparticuzBinDirectory();
+    if (!sparticuzBinDirectory) {
+      console.warn("[pdf] No Sparticuz bin directory found for hosted runtime.");
+      return null;
+    }
+
+    console.warn(`[pdf] Using Sparticuz bin dir: ${sparticuzBinDirectory}`);
+    await ensureSparticuzAl2023Libraries(sparticuzBinDirectory);
+
+    let executablePath: string | null = null;
+    try {
+      executablePath = await chromium.default.executablePath(sparticuzBinDirectory);
+    } catch (error) {
+      console.warn(
+        `[pdf] Sparticuz executablePath failed for ${sparticuzBinDirectory}.`,
+        error instanceof Error ? error.message : error,
+      );
+      return null;
+    }
+
+    if (!executablePath) {
+      console.warn(`[pdf] Sparticuz executablePath returned no path for ${sparticuzBinDirectory}.`);
+      return null;
+    }
+
     return {
+      runtime: "sparticuz" as const,
       executablePath,
       args: [...chromium.default.args, "--allow-file-access-from-files"],
+      headlessMode: true,
     };
   } catch {
     return null;
@@ -250,7 +347,7 @@ async function htmlToPdf(htmlPath: string, pdfPath: string) {
     const browser = await chromium.launch({
       executablePath: launchOptions.executablePath,
       args: launchOptions.args,
-      headless: true,
+      headless: launchOptions.headlessMode,
     });
 
     try {
@@ -277,7 +374,11 @@ async function htmlToPdf(htmlPath: string, pdfPath: string) {
     } finally {
       await browser.close();
     }
-  } catch {
+  } catch (error) {
+    console.warn(
+      `[pdf] Failed to generate PDF using ${launchOptions.runtime} browser runtime.`,
+      error instanceof Error ? error.message : error,
+    );
     return false;
   }
 }

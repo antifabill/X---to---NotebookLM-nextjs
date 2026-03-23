@@ -1,6 +1,6 @@
 # X to NotebookLM Next.js Roadmap
 
-Last updated: 2026-03-19
+Last updated: 2026-03-23
 
 ## Completed so far
 
@@ -28,7 +28,10 @@ Last updated: 2026-03-19
 - [x] Verified the deployed app home page and preview endpoint return `200`.
 - [x] Verified that live Google Drive upload works for a real batch.
 - [x] Fixed quote-tweet/article extraction so exports contain the full quoted article body.
-- [x] Restructured exports so each source gets its own subfolder with `source.txt`, `source.md`, `source.html`, `source.pdf`, and `assets/`.
+- [x] Restructured exports so each source gets its own subfolder with descriptive export filenames plus `assets/`.
+- [x] Verified hosted bucket-backed persistence end to end after deploy: live home page returned `200`, hosted batch `job-1774193456008-94be977d` succeeded, and `/api/jobs`, `/api/jobs/<jobId>`, bundle download, and file download all worked afterward.
+- [x] Verified hosted PDF generation live on App Hosting after the exporter/tracing/runtime fixes: batch `job-1774259965753-6b5c7c7e` produced `.pdf` files for both verified sources, and a hosted PDF download returned `200` with `application/pdf`.
+- [x] Verified the live Google Drive upload flow end to end with a multi-source batch, including nested source folders and the expected `PDF`, `MD`, `TXT`, `HTML`, and `assets` contents.
 
 ## Current roadmap
 
@@ -41,14 +44,14 @@ Last updated: 2026-03-19
 
 ### Infrastructure and deployment
 
-- [ ] Provision a real bucket and set `APP_STORAGE_BUCKET` for persistent hosted job history.
+- [x] Provision a real bucket and set a recognized bucket env var for persistent hosted job history, preferably `APP_STORAGE_BUCKET`.
+- [x] Verify persisted hosted job history after deployment with a real hosted batch run.
 - [ ] Replace the GitHub `FIREBASE_TOKEN` flow with Workload Identity or a dedicated service account.
 - [ ] Add deployment environments for staging vs production.
 - [ ] Add App Hosting runtime monitoring/logging checklist and failure triage notes.
 
 ### Google Drive and NotebookLM flow
 
-- [ ] Verify the live Google Drive upload flow end to end with a multi-source batch and confirm nested source folders in Drive.
 - [ ] Add clearer success/error UX for Drive auth expiration and upload failures.
 - [ ] Improve the NotebookLM handoff flow after export/upload.
 - [ ] Explore whether a more direct NotebookLM import/open handoff is possible.
@@ -90,9 +93,13 @@ Last updated: 2026-03-19
 
 - The current Next.js fork works locally and exports NotebookLM-ready bundles.
 - Google Drive auth now uses a browser-based Google Identity Services flow and can upload finished batches directly to Drive.
-- Storage now supports a deployment-friendly cloud path via `APP_STORAGE_BUCKET`, with safe temp-directory fallback on App Hosting when the bucket is not configured yet.
+- Storage now supports a deployment-friendly cloud path when `APP_STORAGE_BUCKET`, `FIREBASE_STORAGE_BUCKET`, or `GCS_STORAGE_BUCKET` is set.
 - Firebase App Hosting is configured for project `promptsmith-63ac5`.
 - Live deployed URL: `https://x-to-notebooklm-nextjs--promptsmith-63ac5.us-central1.hosted.app`
 - GitHub Actions deployment is configured in `.github/workflows/firebase-apphosting.yml`.
 - Browser-based Drive sign-in is enabled on the live site through a public App Hosting env value for `NEXT_PUBLIC_GOOGLE_CLIENT_ID`.
-- Hosted persistence is still not enabled because `APP_STORAGE_BUCKET` has not been provisioned yet.
+- `APP_STORAGE_BUCKET` is now configured in App Hosting as `promptsmith-63ac5-x-to-notebooklm-us-central1`.
+- Hosted persistence is verified through the deployed app/API path using bucket `promptsmith-63ac5-x-to-notebooklm-us-central1`.
+- Hosted PDF generation is verified through the deployed app/API path using batch `job-1774259965753-6b5c7c7e` and a successful hosted PDF download.
+- The live Google Drive upload flow is also verified end to end with the signed-in browser upload and Drive folder screenshots.
+- That proof is limited to the application-visible flow; retention rules, IAM review/hardening, and any direct bucket-inspection workflow are still open.

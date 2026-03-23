@@ -1,6 +1,6 @@
 # X to NotebookLM Next.js Handoff
 
-Last updated: 2026-03-19
+Last updated: 2026-03-23
 
 ## Purpose
 
@@ -85,6 +85,8 @@ Default behavior in the Next.js UI now enables:
 - `PDF`
 - `HTML`
 
+The `/api/process` route also falls back to `TXT`, `MD`, `PDF`, and `HTML` when `exportFormats` is omitted or invalid.
+
 ### Export structure
 
 Each source now gets its own folder:
@@ -95,10 +97,10 @@ Each source now gets its own folder:
   README-IMPORT.md
   notebooklm_sources.zip
   <source-slug>/
-    source.txt
-    source.md
-    source.html
-    source.pdf
+    <title> - <author>.txt
+    <title> - <author>.md
+    <title> - <author>.html
+    <title> - <author>.pdf
     assets/
       image-01.jpg
       ...
@@ -116,6 +118,10 @@ This replaced the older flat batch layout.
 
 - GitHub push to `main` triggers Firebase deployment.
 - The live app is reachable and functional.
+- `apphosting.yaml` now sets `APP_STORAGE_BUCKET=promptsmith-63ac5-x-to-notebooklm-us-central1` for both build and runtime.
+- Hosted persistence is now verified end to end through the live app/API path after deploy: the home page returned `200`, hosted batch `job-1774193456008-94be977d` succeeded, and `/api/jobs`, `/api/jobs/<jobId>`, bundle download, and file download all worked afterward.
+- Hosted PDF generation is now verified live on App Hosting as well: batch `job-1774259965753-6b5c7c7e` produced `.pdf` entries for both sources, and a hosted PDF download returned `200` with `application/pdf`.
+- The end-to-end Google Drive flow is now verified too: the signed-in browser upload created the expected batch folder plus per-source folders, and the source folder view showed `PDF`, `MD`, `TXT`, `HTML`, and `assets`.
 
 ## Important fixes that were just completed
 
@@ -151,12 +157,7 @@ Problem:
 Fix:
 
 - `src/lib/exporter.ts` now writes one subfolder per source.
-- File naming inside each source folder is normalized to:
-  - `source.txt`
-  - `source.md`
-  - `source.html`
-  - `source.pdf`
-  - `assets/...`
+- File naming inside each source folder now uses a descriptive base name built from the source title and author, plus `assets/...`.
 
 ### 3. Drive path preservation
 
@@ -260,9 +261,11 @@ Legacy Python reference:
 
 ### Storage
 
-- Hosted persistence is not fully set up yet.
-- `APP_STORAGE_BUCKET` has not been provisioned yet.
-- Hosted job history therefore still needs a better long-term storage story.
+- The App Hosting config now includes `APP_STORAGE_BUCKET=promptsmith-63ac5-x-to-notebooklm-us-central1`.
+- Cloud storage becomes active when `APP_STORAGE_BUCKET`, `FIREBASE_STORAGE_BUCKET`, or `GCS_STORAGE_BUCKET` is set.
+- In local development, jobs are stored under `.data/jobs`.
+- Hosted job history has been proven through the application-visible path on the deployed app, backed by bucket `promptsmith-63ac5-x-to-notebooklm-us-central1`.
+- Direct bucket inspection was not part of that check, so keep retention rules, IAM review/hardening, and any bucket-level verification work on the open list.
 
 ### CI / deploy hardening
 
@@ -298,6 +301,15 @@ Important distinction:
 - end users do not need a local `credentials.json`
 - the app still needs Google OAuth configuration in Google Cloud
 
+## PDF export context
+
+- PDF generation is browser-based through `playwright-core`.
+- The app first tries a detected local Chromium-based browser executable.
+- If no local browser is found, it tries `@sparticuz/chromium`.
+- If neither runtime is available, the batch still completes and the source note records that PDF generation was unavailable.
+- After a sequence of App Hosting-specific fixes on 2026-03-23, hosted PDF generation is now working live on Firebase App Hosting for the verified multi-source batch.
+- The remaining PDF-related gap is not generation; it is broader regression coverage so the hosted fix stays stable across future package/runtime changes.
+
 ## Current roadmap summary
 
 See the full tracked list in:
@@ -306,15 +318,13 @@ See the full tracked list in:
 
 Top remaining tasks:
 
-1. Verify a live multi-source Drive upload and confirm nested source folders in Drive.
-2. Provision a real bucket and set `APP_STORAGE_BUCKET`.
-3. Replace GitHub `FIREBASE_TOKEN` deployment auth with Workload Identity or a dedicated service account.
-4. Add regression coverage for:
+1. Replace GitHub `FIREBASE_TOKEN` deployment auth with Workload Identity or a dedicated service account.
+2. Add regression coverage for:
    - quote-tweets that reference article-backed tweets
    - folderized exports
    - Drive path preservation
-5. Improve article extraction parity for edge-case X payloads and direct article URLs.
-6. Do the large UI redesign.
+3. Improve article extraction parity for edge-case X payloads and direct article URLs.
+4. Do the large UI redesign.
 
 ## Suggested next prompt for another Codex session
 
@@ -323,8 +333,8 @@ If you want another Codex instance to continue smoothly, give it this repo and t
 ```text
 Read HANDOFF.md and roadmap.md first, then continue the Next.js app from the current state.
 Focus next on:
-1. verifying live multi-source Drive upload creates nested source folders correctly
-2. adding regression coverage for quote-tweet article extraction and folderized exports
+1. adding regression coverage for quote-tweet article extraction and folderized exports
+2. hardening the hosted PDF/export pipeline against future runtime/package changes
 Do not rework the UI yet unless necessary.
 ```
 

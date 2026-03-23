@@ -18,16 +18,21 @@ Project context:
 - It can generate TXT, MD, HTML, PDF, download images, package batches, and upload the batch to Google Drive.
 - The live app is deployed on Firebase App Hosting.
 - Google Drive browser sign-in is already working.
+- The `/api/process` route defaults to TXT, MD, PDF, and HTML when `exportFormats` is omitted.
+- Cloud storage is enabled when `APP_STORAGE_BUCKET`, `FIREBASE_STORAGE_BUCKET`, or `GCS_STORAGE_BUCKET` is set; local dev uses `.data/jobs`, and hosted mode without a bucket falls back to temp storage.
 
 Recent important state:
 - Quote-tweets that reference tweets with attached X Articles were fixed so they now export the full quoted article body instead of only the outer tweet text.
 - Exports were restructured so each source gets its own folder:
-  <batch>/<source-slug>/source.txt
-  <batch>/<source-slug>/source.md
-  <batch>/<source-slug>/source.html
-  <batch>/<source-slug>/source.pdf
+  <batch>/<source-slug>/<title> - <author>.txt
+  <batch>/<source-slug>/<title> - <author>.md
+  <batch>/<source-slug>/<title> - <author>.html
+  <batch>/<source-slug>/<title> - <author>.pdf
   <batch>/<source-slug>/assets/...
 - The Drive uploader is expected to preserve that relative folder structure.
+- PDF export is generated with `playwright-core` using either a detected local Chromium-based browser or `@sparticuz/chromium` when available.
+- Hosted PDF generation is now verified live on Firebase App Hosting; it is no longer an open viability question.
+- The live Google Drive upload flow is now verified end to end, including nested source folders and the expected `PDF`, `MD`, `TXT`, `HTML`, and `assets` contents in Drive.
 
 Important test URLs:
 - Quote-tweet/article case:
@@ -38,11 +43,11 @@ Important test URLs:
   https://x.com/jack/status/20
 
 Current priority:
-1. Verify the live Google Drive upload flow end to end with a multi-source batch and confirm nested source folders in Drive.
-2. Add regression coverage for:
+1. Add regression coverage for:
    - quote-tweets that reference article-backed tweets
    - folderized exports
    - Drive path preservation
+2. Harden the hosted PDF/export pipeline so the App Hosting fix stays stable across future dependency/runtime changes.
 3. Keep roadmap.md updated as tasks are completed.
 
 Important constraints:
