@@ -1,0 +1,54 @@
+{
+  "data": {
+    "tweetResult": {
+      "result": {
+        "__typename": "Tweet",
+        "core": {
+          "user_results": {
+            "result": {
+              "core": {
+                "screen_name": "itsolelehmann",
+                "name": "Ole Lehmann"
+              }
+            }
+          }
+        },
+        "legacy": {
+          "created_at": "Tue Mar 18 09:20:00 +0000 2026",
+          "full_text": "How to 10x your Claude skills."
+        },
+        "article": {
+          "article_results": {
+            "result": {
+              "title": "How to 10x your Claude Skills",
+              "metadata": {
+                "first_published_at_secs": 1773814800
+              },
+              "content_state": {
+                "blocks": [
+                  {
+                    "type": "paragraph",
+                    "text": "Treat research, synthesis, and iteration as distinct prompt phases."
+                  },
+                  {
+                    "type": "unordered-list-item",
+                    "text": "Draft fast"
+                  },
+                  {
+                    "type": "unordered-list-item",
+                    "text": "Refine with evidence"
+                  }
+                ]
+              },
+              "cover_media": {
+                "media_info": {
+                  "original_img_url": "https://pbs.twimg.com/media/claude-cover.jpg"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

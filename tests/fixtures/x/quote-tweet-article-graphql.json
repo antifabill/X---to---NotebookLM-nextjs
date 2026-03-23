@@ -1,0 +1,82 @@
+{
+  "data": {
+    "tweetResult": {
+      "result": {
+        "__typename": "Tweet",
+        "core": {
+          "user_results": {
+            "result": {
+              "core": {
+                "screen_name": "LLMJunky",
+                "name": "am.will"
+              }
+            }
+          }
+        },
+        "legacy": {
+          "created_at": "Tue Mar 11 18:41:56 +0000 2026",
+          "full_text": "This is one of the most impressive guides I've seen for building games with Codex.",
+          "quoted_status_permalink": {
+            "expanded": "https://x.com/Quoter/status/2031802800000000000"
+          }
+        },
+        "quoted_status_result": {
+          "result": {
+            "__typename": "Tweet",
+            "core": {
+              "user_results": {
+                "result": {
+                  "core": {
+                    "screen_name": "Quoter",
+                    "name": "Guide Builder"
+                  }
+                }
+              }
+            },
+            "legacy": {
+              "created_at": "Tue Mar 11 17:30:00 +0000 2026"
+            },
+            "article": {
+              "article_results": {
+                "result": {
+                  "title": "Building Games With Codex",
+                  "metadata": {
+                    "first_published_at_secs": 1773254400
+                  },
+                  "content_state": {
+                    "blocks": [
+                      {
+                        "type": "header-two",
+                        "text": "Why it matters"
+                      },
+                      {
+                        "type": "paragraph",
+                        "text": "Codex can now generate playable game loops with art, logic, and iteration."
+                      },
+                      {
+                        "type": "paragraph",
+                        "text": "The guide walks through prompts, level structure, and polishing passes."
+                      }
+                    ]
+                  },
+                  "cover_media": {
+                    "media_info": {
+                      "original_img_url": "https://pbs.twimg.com/media/guide-cover.jpg"
+                    }
+                  },
+                  "media_entities": [
+                    {
+                      "media_info": {
+                        "original_img_url": "https://pbs.twimg.com/media/guide-inline.jpg"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

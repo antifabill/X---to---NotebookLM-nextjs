@@ -383,11 +383,22 @@ async function htmlToPdf(htmlPath: string, pdfPath: string) {
   }
 }
 
-export async function writeSourceOutputs(source: SourceContent, outDir: string, exportFormats: Set<string>, includeMedia: boolean): Promise<SourceRecord> {
+type WriteSourceOutputOptions = {
+  pdfRenderer?: (htmlPath: string, pdfPath: string) => Promise<boolean>;
+};
+
+export async function writeSourceOutputs(
+  source: SourceContent,
+  outDir: string,
+  exportFormats: Set<string>,
+  includeMedia: boolean,
+  options?: WriteSourceOutputOptions,
+): Promise<SourceRecord> {
   const sourceDirName = slugify(`${source.title}-${sourceIdentifier(source.url)}`);
   const sourceDir = path.join(outDir, sourceDirName);
   const assetDir = path.join(sourceDir, "assets");
   const baseName = outputBaseName(source);
+  const pdfRenderer = options?.pdfRenderer || htmlToPdf;
 
   await mkdir(sourceDir, { recursive: true });
 
@@ -417,7 +428,7 @@ export async function writeSourceOutputs(source: SourceContent, outDir: string, 
 
   if (exportFormats.has("pdf") && htmlName) {
     const pdfName = `${baseName}.pdf`;
-    if (await htmlToPdf(path.join(sourceDir, htmlName), path.join(sourceDir, pdfName))) {
+    if (await pdfRenderer(path.join(sourceDir, htmlName), path.join(sourceDir, pdfName))) {
       outputFiles.push(`${sourceDirName}/${pdfName}`);
     } else {
       source.note = `${source.note ? `${source.note} ` : ""}PDF export was requested, but browser-based PDF generation was not available.`;

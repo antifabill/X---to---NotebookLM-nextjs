@@ -212,10 +212,22 @@ Verified:
 
 Verified:
 
+- `npm test` (3 passing files, 8 passing tests)
 - `npm run lint`
 - `npm run build`
 
 Both passed after the latest fixes.
+
+### Regression harness
+
+The repo now has a small Node-side Vitest harness.
+
+Current covered areas:
+
+- quote-tweet article extraction in `tests/x.parse-source.test.ts`
+- folderized export structure and descriptive filenames in `tests/exporter.test.ts`
+- PDF success/fallback behavior at the exporter seam in `tests/exporter.test.ts`
+- Drive path preservation and nested folder planning in `tests/google-drive.test.ts`
 
 ## Important files
 
@@ -319,11 +331,8 @@ See the full tracked list in:
 Top remaining tasks:
 
 1. Replace GitHub `FIREBASE_TOKEN` deployment auth with Workload Identity or a dedicated service account.
-2. Add regression coverage for:
-   - quote-tweets that reference article-backed tweets
-   - folderized exports
-   - Drive path preservation
-3. Improve article extraction parity for edge-case X payloads and direct article URLs.
+2. Improve article extraction parity for edge-case X payloads and direct article URLs.
+3. Add broader regression cases for tweet, article, and generic page exports.
 4. Do the large UI redesign.
 
 ## Suggested next prompt for another Codex session
@@ -333,8 +342,8 @@ If you want another Codex instance to continue smoothly, give it this repo and t
 ```text
 Read HANDOFF.md and roadmap.md first, then continue the Next.js app from the current state.
 Focus next on:
-1. adding regression coverage for quote-tweet article extraction and folderized exports
-2. hardening the hosted PDF/export pipeline against future runtime/package changes
+1. improving article extraction parity for edge-case X payloads and direct article URLs
+2. replacing GitHub FIREBASE_TOKEN deployment auth with Workload Identity or a dedicated service account
 Do not rework the UI yet unless necessary.
 ```
 

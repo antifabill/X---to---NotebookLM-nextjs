@@ -32,6 +32,8 @@ Last updated: 2026-03-23
 - [x] Verified hosted bucket-backed persistence end to end after deploy: live home page returned `200`, hosted batch `job-1774193456008-94be977d` succeeded, and `/api/jobs`, `/api/jobs/<jobId>`, bundle download, and file download all worked afterward.
 - [x] Verified hosted PDF generation live on App Hosting after the exporter/tracing/runtime fixes: batch `job-1774259965753-6b5c7c7e` produced `.pdf` files for both verified sources, and a hosted PDF download returned `200` with `application/pdf`.
 - [x] Verified the live Google Drive upload flow end to end with a multi-source batch, including nested source folders and the expected `PDF`, `MD`, `TXT`, `HTML`, and `assets` contents.
+- [x] Added a Vitest regression harness covering quote-tweet article extraction, folderized exports, PDF exporter seam behavior, and Drive path preservation.
+- [x] Verified the regression slice locally on 2026-03-23: `npm test` passed with 3 passing files and 8 passing tests, `npm run lint` passed, and `npm run build` passed.
 
 ## Current roadmap
 
@@ -64,8 +66,9 @@ Last updated: 2026-03-23
 
 ### Extraction and output quality
 
-- [ ] Add regression coverage for quote-tweets that reference article-backed tweets.
-- [ ] Add regression coverage for folderized exports and Drive path preservation.
+- [x] Add regression coverage for quote-tweets that reference article-backed tweets.
+- [x] Add regression coverage for folderized exports and Drive path preservation.
+- [x] Add regression coverage for hosted PDF behavior at the exporter seam.
 - [ ] Improve article extraction parity for edge-case X payloads and direct article URLs.
 - [ ] Add better formatting preservation in Markdown and PDF exports.
 - [ ] Add more resilient image handling and clearer missing-media notes.
@@ -102,4 +105,7 @@ Last updated: 2026-03-23
 - Hosted persistence is verified through the deployed app/API path using bucket `promptsmith-63ac5-x-to-notebooklm-us-central1`.
 - Hosted PDF generation is verified through the deployed app/API path using batch `job-1774259965753-6b5c7c7e` and a successful hosted PDF download.
 - The live Google Drive upload flow is also verified end to end with the signed-in browser upload and Drive folder screenshots.
+- The local regression harness now uses Vitest via `npm test`.
+- Current regression coverage lives in `tests/x.parse-source.test.ts`, `tests/exporter.test.ts`, and `tests/google-drive.test.ts`.
+- Local verification for the regression slice is grounded as of 2026-03-23: `npm test` passed with 3 passing files and 8 passing tests, `npm run lint` passed, and `npm run build` passed.
 - That proof is limited to the application-visible flow; retention rules, IAM review/hardening, and any direct bucket-inspection workflow are still open.

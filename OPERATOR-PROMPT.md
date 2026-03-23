@@ -33,6 +33,8 @@ Recent important state:
 - PDF export is generated with `playwright-core` using either a detected local Chromium-based browser or `@sparticuz/chromium` when available.
 - Hosted PDF generation is now verified live on Firebase App Hosting; it is no longer an open viability question.
 - The live Google Drive upload flow is now verified end to end, including nested source folders and the expected `PDF`, `MD`, `TXT`, `HTML`, and `assets` contents in Drive.
+- The repo now has a Vitest regression harness. `npm test` passed locally on 2026-03-23 with 3 passing files and 8 passing tests, and `npm run lint` plus `npm run build` also passed.
+- Current regression coverage lives in `tests/x.parse-source.test.ts`, `tests/exporter.test.ts`, and `tests/google-drive.test.ts`.
 
 Important test URLs:
 - Quote-tweet/article case:
@@ -43,11 +45,8 @@ Important test URLs:
   https://x.com/jack/status/20
 
 Current priority:
-1. Add regression coverage for:
-   - quote-tweets that reference article-backed tweets
-   - folderized exports
-   - Drive path preservation
-2. Harden the hosted PDF/export pipeline so the App Hosting fix stays stable across future dependency/runtime changes.
+1. Improve article extraction parity for edge-case X payloads and direct article URLs.
+2. Replace the GitHub `FIREBASE_TOKEN` deployment auth with Workload Identity or a dedicated service account.
 3. Keep roadmap.md updated as tasks are completed.
 
 Important constraints:

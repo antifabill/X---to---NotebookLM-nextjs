@@ -17,10 +17,11 @@
 - `firebase.json`, `apphosting.yaml`, and `.github/workflows/firebase-apphosting.yml`: deployment and hosting configuration.
 
 ## Commands and Verification
-- `package.json` defines `npm run dev`, `npm run build`, `npm run start`, and `npm run lint`.
+- `package.json` defines `npm run dev`, `npm run build`, `npm run start`, `npm run lint`, `npm test`, and `npm run test:watch`.
 - `README.md` documents `npm install`, `npm run dev`, `npm run lint`, and `npm run build` as the main local and production checks.
 - `HANDOFF.md` says `npm run lint` and `npm run build` passed after the latest fixes.
-- No automated test script is defined in `package.json`; roadmap items still call for regression coverage.
+- On 2026-03-23, a new Vitest harness was added with `vitest.config.ts`, `tests/setup.ts`, committed fixtures under `tests/fixtures/x`, and regression specs for extraction, exporter behavior, and Drive upload planning.
+- On 2026-03-23, `npm test`, `npm run lint`, and `npm run build` all passed locally after the regression slice; Vitest reported 3 passing files and 8 passing tests.
 - On 2026-03-23, the deployed app successfully processed a live multi-source batch (`job-1774252978810-9aa00724`) with `https://x.com/itsolelehmann/status/2033919415771713715?s=20` and `https://x.com/jack/status/20`, and the hosted `/api/jobs`, `/api/jobs/<jobId>`, bundle, and file download endpoints all returned `200`.
 - On 2026-03-23, after the hosted PDF fixes, the deployed app successfully generated PDFs for a live multi-source batch (`job-1774259965753-6b5c7c7e`), and a hosted PDF download returned `200` with `application/pdf`.
 
@@ -29,6 +30,8 @@
 - `src/components/app-shell.tsx` uses local React state plus `fetch()` calls to the app's own API routes instead of server actions.
 - `src/lib/jobs.ts` stores jobs under `.data/jobs` locally and switches to temp storage plus optional cloud upload behavior in hosted environments.
 - `src/lib/google-drive.ts` uses browser local storage and Google Identity Services to manage Drive auth on the client.
+- `src/lib/exporter.ts` now exposes a small `pdfRenderer` injection seam on `writeSourceOutputs(...)` so regression tests can verify the PDF branch without launching a real browser.
+- `src/lib/google-drive.ts` now exposes a pure `buildDriveUploadPlan(job)` helper so the nested-folder upload logic can be tested without hitting the Drive API.
 
 ## Fragile Areas and Risks
 - `src/lib/x.ts` relies on public X guest-token, GraphQL, and syndication responses, so extraction can break if those public payloads change.
@@ -43,9 +46,14 @@
 - `README.md` says Google Drive was intentionally moved to a browser-based sign-in flow so end users do not need a local `credentials.json`.
 - `src/lib/jobs.ts` and `README.md` reflect a deployment-friendly storage decision: use local `.data/jobs` in development and cloud storage in hosted mode when a recognized bucket env var is present.
 - `HANDOFF.md` documents that quote-tweet article extraction was changed so the quoted article body becomes the main export content when available, with the outer tweet kept as context.
+- Regression coverage should start with a small Node-side Vitest harness rather than browser E2E, because the highest-risk logic is concentrated in `src/lib/x.ts`, `src/lib/exporter.ts`, and `src/lib/google-drive.ts`.
+- The current exporter and Drive modules likely need small test seams instead of full integration harnesses: inject a PDF renderer into `writeSourceOutputs` and extract a pure Drive upload-plan helper from `src/lib/google-drive.ts`.
+- The regression-coverage slice followed that plan: keep Node-side tests focused on extraction, folderized exports, PDF success/failure behavior at the seam, and Drive path preservation, while leaving signed-in browser Drive checks as manual verification.
 
 ## Active Work
 - `roadmap.md` now treats both bucket provisioning and hosted persistence verification as complete, while still listing `FIREBASE_TOKEN` replacement, staging/production environments, and runtime monitoring/triage notes.
+- Regression coverage for quote-tweet article extraction, folderized exports, hosted PDF seam behavior, and Drive path preservation is now implemented locally but still needs to be committed and pushed.
+- The next likely implementation slice is deploy-auth hardening: replace `FIREBASE_TOKEN` in `.github/workflows/firebase-apphosting.yml` with Workload Identity Federation or a dedicated service-account flow.
 - Product flow work still open includes improving Drive auth/error UX and improving the NotebookLM handoff.
 - Storage/job lifecycle work still open includes retention rules, clearer hosted-mode behavior, and a delete-job action in the UI.
 - `roadmap.md` also lists a major UI makeover, but `HANDOFF.md` and `OPERATOR-PROMPT.md` say not to start that redesign yet unless needed for a blocking fix.
@@ -60,6 +68,8 @@
 - User-provided Drive screenshots on 2026-03-23 confirmed the final browser-only step: the uploaded Drive batch contains the expected root files plus per-source folders, and the source folder view shows `PDF`, `MD`, `TXT`, `HTML`, and `assets`.
 - The stale docs drift around export structure and exporter/job behavior has been corrected in the current docs set, so README, HANDOFF, roadmap, and memory should now be treated as aligned unless code changes again.
 - `README.md` says the live app and preview endpoint were verified and that a real Drive upload worked on the deployed site.
+- The new regression harness added `vitest` to `package.json`, created `vitest.config.ts` and `tests/setup.ts`, added sanitized X fixtures under `tests/fixtures/x`, and introduced `tests/x.parse-source.test.ts`, `tests/exporter.test.ts`, and `tests/google-drive.test.ts`.
+- The exporter and Drive test seams landed with minimal source changes: `src/lib/exporter.ts` accepts an optional injected `pdfRenderer`, and `src/lib/google-drive.ts` now exports `buildDriveUploadPlan(job)` which `uploadJobToDrive(...)` consumes internally.
 
 ## Lessons Learned
 - `HANDOFF.md` says to prefer the Next.js repo over the legacy Python repo for new work.
@@ -68,3 +78,4 @@
 - Documentation drift was a real issue here, but the current export-structure notes have been refreshed and now match `src/lib/exporter.ts`; re-check them after future exporter/job changes.
 - App Hosting-specific failures became diagnosable only after adding targeted runtime logs. The hosted PDF fix required following the chain from missing asset discovery to Playwright launch typing to missing `libnspr4.so`, rather than treating it as one generic browser problem.
 - The Drive flow really does need two separate proofs: server-side export generation and a signed-in browser upload check. Treat them as separate milestones in future verification work.
+- Node-side regression coverage is a good fit for this repo's riskiest logic. The tests are fast enough to run routinely, and small seams in `src/lib/exporter.ts` and `src/lib/google-drive.ts` were enough to avoid brittle browser-heavy test setup.

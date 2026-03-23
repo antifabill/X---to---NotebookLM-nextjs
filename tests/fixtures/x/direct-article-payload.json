@@ -1,0 +1,19 @@
+{
+  "id_str": "2033919415771713715",
+  "text": "How to 10x your Claude skills.",
+  "created_at": "2026-03-18T09:20:00.000Z",
+  "user": {
+    "screen_name": "itsolelehmann",
+    "name": "Ole Lehmann"
+  },
+  "entities": {
+    "urls": []
+  },
+  "mediaDetails": [
+    {
+      "media_url_https": "https://pbs.twimg.com/media/claude-inline.jpg",
+      "display_url": "pic.x.com/claude-inline",
+      "type": "photo"
+    }
+  ]
+}

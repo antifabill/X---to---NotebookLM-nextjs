@@ -36,6 +36,12 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Production checks
 
+Tests:
+
+```bash
+npm test
+```
+
 Lint:
 
 ```bash
@@ -51,11 +57,13 @@ npm run build
 ## Notes
 
 - PDF generation uses `playwright-core` with either a detected local Chromium-based browser or `@sparticuz/chromium` as the executable source. If no compatible browser runtime is available, the export continues without a PDF and records a note for that source.
+- Local regression coverage now uses Vitest. The current suite covers quote-tweet article extraction, folderized exports, PDF success/fallback behavior at the exporter seam, and Drive path preservation.
 - Local development stores batch jobs in `.data/jobs`.
 - Cloud storage is enabled when any of `APP_STORAGE_BUCKET`, `FIREBASE_STORAGE_BUCKET`, or `GCS_STORAGE_BUCKET` is set.
 - App Hosting is configured with `APP_STORAGE_BUCKET=promptsmith-63ac5-x-to-notebooklm-us-central1` for build and runtime.
 - Hosted persistence has been verified end to end through the deployed app/API path after App Hosting deploy: the live home page returned `200`, hosted batch `job-1774193456008-94be977d` succeeded, and `/api/jobs`, `/api/jobs/<jobId>`, bundle download, and file download all worked afterward.
 - Hosted PDF generation is also now verified live on App Hosting: batch `job-1774259965753-6b5c7c7e` produced `.pdf` files for both tested sources, and a hosted PDF download returned `200` with `application/pdf`.
+- Local verification for the regression slice is grounded as of 2026-03-23: `npm test` passed with 3 passing files and 8 passing tests, `npm run lint` passed, and `npm run build` passed.
 
 ## Google Drive web flow
 
@@ -101,6 +109,6 @@ The end-to-end Google Drive flow is now verified too: a signed-in browser upload
 
 ## Next migration steps
 
-1. Improve article extraction parity and quality on edge-case X payloads.
-2. Replace the temporary GitHub deploy token flow with Workload Identity or a dedicated service account when ready.
+1. Replace the temporary GitHub deploy token flow with Workload Identity or a dedicated service account when ready.
+2. Improve article extraction parity and quality on edge-case X payloads and direct article URLs.
 3. Define retention rules and any cleanup behavior for hosted job artifacts.

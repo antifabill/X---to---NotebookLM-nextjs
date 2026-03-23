@@ -22,6 +22,18 @@ type DriveUploadResult = {
   uploadedCount: number;
 };
 
+export type DriveUploadPlanEntry = {
+  relativeFile: string;
+  fileName: string;
+  folderSegments: string[];
+  folderPaths: string[];
+};
+
+export type DriveUploadPlan = {
+  files: DriveUploadPlanEntry[];
+  folders: string[];
+};
+
 function configured() {
   return Boolean(GOOGLE_CLIENT_ID);
 }
@@ -300,6 +312,36 @@ function collectJobFiles(job: JobResult) {
   return [...files].sort((left, right) => left.localeCompare(right));
 }
 
+export function buildDriveUploadPlan(job: JobResult): DriveUploadPlan {
+  const folders = new Set<string>();
+  const files = collectJobFiles(job)
+    .map((relativeFile) => {
+      const parts = relativeFile.split("/").filter(Boolean);
+      const fileName = parts.pop();
+      if (!fileName) return null;
+
+      const folderSegments = [...parts];
+      const folderPaths = folderSegments.map((_, index) => folderSegments.slice(0, index + 1).join("/"));
+      for (const folderPath of folderPaths) folders.add(folderPath);
+
+      return {
+        relativeFile,
+        fileName,
+        folderSegments,
+        folderPaths,
+      } satisfies DriveUploadPlanEntry;
+    })
+    .filter((entry): entry is DriveUploadPlanEntry => Boolean(entry));
+
+  return {
+    files,
+    folders: [...folders].sort((left, right) => {
+      const depthDifference = left.split("/").length - right.split("/").length;
+      return depthDifference === 0 ? left.localeCompare(right) : depthDifference;
+    }),
+  };
+}
+
 async function fetchJobFile(baseUrl: string, jobId: string, relativeFile: string) {
   const response = await fetch(`${baseUrl}/api/jobs/${jobId}/download?file=${encodeURIComponent(relativeFile)}`);
   if (!response.ok) throw new Error(`Could not download ${relativeFile} from the app server.`);
@@ -323,17 +365,12 @@ export async function uploadJobToDrive(
   const rootFolderId = await ensureDriveFolder(token.accessToken, DRIVE_ROOT_FOLDER);
   const batchFolderId = await ensureDriveFolder(token.accessToken, `${job.outDirName}-${job.jobId.slice(-8)}`, rootFolderId);
   const folderCache = new Map<string, string>([["", batchFolderId]]);
-  const files = collectJobFiles(job);
+  const plan = buildDriveUploadPlan(job);
 
-  for (const [index, relativeFile] of files.entries()) {
-    const parts = relativeFile.split("/").filter(Boolean);
-    const fileName = parts.pop();
-    if (!fileName) continue;
-
+  for (const [index, entry] of plan.files.entries()) {
     let parentId = batchFolderId;
-    let currentPath = "";
-    for (const segment of parts) {
-      currentPath = currentPath ? `${currentPath}/${segment}` : segment;
+    for (const [segmentIndex, segment] of entry.folderSegments.entries()) {
+      const currentPath = entry.folderPaths[segmentIndex];
       const cachedFolder = folderCache.get(currentPath);
       if (cachedFolder) {
         parentId = cachedFolder;
@@ -345,14 +382,14 @@ export async function uploadJobToDrive(
       parentId = createdFolderId;
     }
 
-    options?.onProgress?.(index + 1, files.length, relativeFile);
-    const blob = await fetchJobFile(baseUrl, job.jobId, relativeFile);
-    await uploadDriveFile(token.accessToken, parentId, fileName, blob);
+    options?.onProgress?.(index + 1, plan.files.length, entry.relativeFile);
+    const blob = await fetchJobFile(baseUrl, job.jobId, entry.relativeFile);
+    await uploadDriveFile(token.accessToken, parentId, entry.fileName, blob);
   }
 
   return {
     folderId: batchFolderId,
     folderUrl: `https://drive.google.com/drive/folders/${batchFolderId}`,
-    uploadedCount: files.length,
+    uploadedCount: plan.files.length,
   };
 }
